@@ -66,7 +66,7 @@ namespace EmpresasIntegration.Services
             empresa.Cep = TryGet(root, "cep");
             empresa.Email = TryGet(root, "email");
             empresa.Telefone = TryGet(root, "telefone");
-            empresa.UltimaAtualizacao = TryGet(root, "ultima_atualizacao");
+            empresa.UltimaAtualizacao = ParseDate(TryGet(root, "ultima_atualizacao"));
             empresa.Abertura = ParseDate(TryGet(root, "abertura"));
             empresa.DataSituacao = ParseDate(TryGet(root, "data_situacao"));
             empresa.CapitalSocial = ParseDecimal(TryGet(root, "capital_social"));
