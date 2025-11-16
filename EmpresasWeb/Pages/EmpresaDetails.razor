@@ -1,21 +1,36 @@
 @page "/empresas/{id:int}"
 @inject IHttpClientFactory ClientFactory
+@inject NavigationManager Navigation
 @using System.Net.Http.Json
 
 <h3>Detalhes da Empresa</h3>
 
-@if (Empresa == null)
+@if (isLoading)
 {
     <p>Carregando...</p>
+}
+else if (loadError != null)
+{
+    <div class="alert alert-danger">@loadError</div>
+    <button class="btn btn-secondary" @onclick="GoBack">Voltar</button>
+}
+else if (Empresa == null)
+{
+    <p>Empresa não encontrada.</p>
+    <button class="btn btn-secondary" @onclick="GoBack">Voltar</button>
 }
 else
 {
     <div class="card">
         <div class="card-body">
             <h5 class="card-title">@Empresa.Nome</h5>
-            <p><strong>CNPJ:</strong> @Empresa.Cnpj</p>
+            <p><strong>CNPJ:</strong> @(!string.IsNullOrWhiteSpace(Empresa.CnpjFormatado) ? Empresa.CnpjFormatado : Empresa.Cnpj)</p>
             <p><strong>Endereço:</strong> @Empresa.Endereco</p>
             <p><strong>Atividade Principal:</strong> @Empresa.AtividadePrincipal</p>
+            <div class="mt-3">
+                <button class="btn btn-secondary" @onclick="GoBack">Voltar</button>
+                <button class="btn btn-primary" @onclick="GoEdit">Editar</button>
+            </div>
         </div>
     </div>
 }
@@ -25,15 +40,47 @@ else
 
     private HttpClient Http => ClientFactory.CreateClient("ApiClient");
     private EmpresaDto? Empresa;
+    private bool isLoading = true;
+    private string? loadError;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        Empresa = await Http.GetFromJsonAsync<EmpresaDto>($"api/empresas/{id}");
+        isLoading = true;
+        loadError = null;
+        Empresa = null;
+
+        try
+        {
+            Empresa = await Http.GetFromJsonAsync<EmpresaDto>($"api/empresas/{id}");
+            if (Empresa == null)
+            {
+                // Caso a API retorne 404 sem conteúdo, Navigation pode redirecionar para a lista.
+                // Comentado para manter o usuário na página e mostrar mensagem; descomente se preferir redirecionar.
+                // Navigation.NavigateTo("/empresas");
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            loadError = $"Erro ao carregar empresa: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            loadError = "Ocorreu um erro inesperado ao carregar a empresa.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
+
+    private void GoBack() => Navigation.NavigateTo("/empresas");
+    private void GoEdit() => Navigation.NavigateTo($"/empresas/editar/{id}");
 
     public class EmpresaDto
     {
+        public int Id { get; set; }
         public string? Cnpj { get; set; }
+        public string? CnpjFormatado { get; set; }
         public string? Nome { get; set; }
         public string? Endereco { get; set; }
         public string? AtividadePrincipal { get; set; }

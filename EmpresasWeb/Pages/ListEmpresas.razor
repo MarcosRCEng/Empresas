@@ -1,5 +1,6 @@
 @page "/empresas"
 @inject HttpClient Http
+@inject NavigationManager Navigation
 
 <h3>Lista de Empresas</h3>
 
@@ -20,16 +21,24 @@ else
                 <th>Nome</th>
                 <th>Endereço</th>
                 <th>Atividade Principal</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
             @foreach (var empresa in empresas)
             {
                 <tr>
-                    <td>@empresa.Cnpj</td>
+                    <td>
+                        <a href="javascript:void(0)" @onclick="() => GoToDetalhes(empresa.Id)">
+                            @(!string.IsNullOrWhiteSpace(empresa.CnpjFormatado) ? empresa.CnpjFormatado : empresa.Cnpj)
+                        </a>
+                    </td>
                     <td>@empresa.Nome</td>
                     <td>@empresa.Endereco</td>
                     <td>@empresa.AtividadePrincipalJson</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" @onclick="() => GoToEditar(empresa.Id)">Editar</button>
+                    </td>
                 </tr>
             }
         </tbody>
@@ -44,9 +53,22 @@ else
         empresas = await Http.GetFromJsonAsync<List<EmpresaView>>("api/empresas");
     }
 
+    private void GoToDetalhes(int id)
+    {
+        Navigation.NavigateTo($"/empresas/{id}");
+    }
+
+    private void GoToEditar(int id)
+    {
+        Navigation.NavigateTo($"/empresas/editar/{id}");
+    }
+
     public class EmpresaView
     {
+        public int Id { get; set; }
+        // Se sua API só retorna Cnpj sem formatação, mantenha ambos campos:
         public string? Cnpj { get; set; }
+        public string? CnpjFormatado { get; set; }
         public string? Nome { get; set; }
         public string? Endereco { get; set; }
         public string? AtividadePrincipalJson { get; set; }
