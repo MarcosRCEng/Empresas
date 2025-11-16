@@ -1,0 +1,54 @@
+@page "/empresas"
+@inject HttpClient Http
+
+<h3>Lista de Empresas</h3>
+
+@if (empresas == null)
+{
+    <p>Carregando...</p>
+}
+else if (!empresas.Any())
+{
+    <p>Nenhuma empresa encontrada.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>CNPJ</th>
+                <th>Nome</th>
+                <th>Endereço</th>
+                <th>Atividade Principal</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var empresa in empresas)
+            {
+                <tr>
+                    <td>@empresa.Cnpj</td>
+                    <td>@empresa.Nome</td>
+                    <td>@empresa.Endereco</td>
+                    <td>@empresa.AtividadePrincipalJson</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<EmpresaView>? empresas;
+
+    protected override async Task OnInitializedAsync()
+    {
+        empresas = await Http.GetFromJsonAsync<List<EmpresaView>>("api/empresas");
+    }
+
+    public class EmpresaView
+    {
+        public string? Cnpj { get; set; }
+        public string? Nome { get; set; }
+        public string? Endereco { get; set; }
+        public string? AtividadePrincipalJson { get; set; }
+    }
+}

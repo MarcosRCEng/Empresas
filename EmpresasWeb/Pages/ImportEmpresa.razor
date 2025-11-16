@@ -1,0 +1,91 @@
+@page "/importar-empresa"
+@inject HttpClient Http
+
+<h3>Importar Empresa</h3>
+
+@if (sucesso)
+{
+    <div class="alert alert-success">Empresa importada com sucesso!</div>
+}
+
+<EditForm Model="novaEmpresa" OnValidSubmit="ImportarEmpresa">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label>CNPJ:</label>
+        <InputText class="form-control" @bind-Value="novaEmpresa.Cnpj" />
+    </div>
+
+    <div class="mb-3">
+        <label>Nome:</label>
+        <InputText class="form-control" @bind-Value="novaEmpresa.Nome" />
+    </div>
+
+    <div class="mb-3">
+        <label>Logradouro:</label>
+        <InputText class="form-control" @bind-Value="novaEmpresa.Logradouro" />
+    </div>
+
+    <div class="mb-3">
+        <label>Número:</label>
+        <InputText class="form-control" @bind-Value="novaEmpresa.Numero" />
+    </div>
+
+    <div class="mb-3">
+        <label>Complemento:</label>
+        <InputText class="form-control" @bind-Value="novaEmpresa.Complemento" />
+    </div>
+
+    <div class="mb-3">
+        <label>Bairro:</label>
+        <InputText class="form-control" @bind-Value="novaEmpresa.Bairro" />
+    </div>
+
+    <div class="mb-3">
+        <label>Município:</label>
+        <InputText class="form-control" @bind-Value="novaEmpresa.Municipio" />
+    </div>
+
+    <div class="mb-3">
+        <label>UF:</label>
+        <InputText class="form-control" @bind-Value="novaEmpresa.Uf" />
+    </div>
+
+    <div class="mb-3">
+        <label>CEP:</label>
+        <InputText class="form-control" @bind-Value="novaEmpresa.Cep" />
+    </div>
+
+    <div class="mb-3">
+        <label>Atividade Principal (JSON):</label>
+        <InputTextArea class="form-control" @bind-Value="novaEmpresa.AtividadePrincipalJson" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Importar</button>
+</EditForm>
+
+@code {
+    private EmpresaDto novaEmpresa = new();
+    private bool sucesso = false;
+
+    private async Task ImportarEmpresa()
+    {
+        var response = await Http.PostAsJsonAsync("api/empresas", novaEmpresa);
+        sucesso = response.IsSuccessStatusCode;
+    }
+
+    public class EmpresaDto
+    {
+        public string? Cnpj { get; set; }
+        public string? Nome { get; set; }
+        public string? Logradouro { get; set; }
+        public string? Numero { get; set; }
+        public string? Complemento { get; set; }
+        public string? Bairro { get; set; }
+        public string? Municipio { get; set; }
+        public string? Uf { get; set; }
+        public string? Cep { get; set; }
+        public string? AtividadePrincipalJson { get; set; }
+    }
+}

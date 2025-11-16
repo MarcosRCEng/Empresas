@@ -1,0 +1,374 @@
+*** Begin Patch
+*** Add File: src/Modules/Cadastros/Module.Cadastros.Application/DTOs/EmpresaQuery.cs
++namespace Module.Cadastros.Application.DTOs
++{
++    public class EmpresaQuery
++    {
++        public string? Cnpj { get; set; }
++        public string? Uf { get; set; }
++        public string? Municipio { get; set; }
++        public string? Nome { get; set; }
++        public int Page { get; set; } = 1;
++        public int PageSize { get; set; } = 20;
++    }
++}
+*** End Patch
+
+*** Begin Patch
+*** Add File: src/Modules/Cadastros/Module.Cadastros.Application/DTOs/PagedResult.cs
++using System.Collections.Generic;
++
++namespace Module.Cadastros.Application.DTOs
++{
++    public class PagedResult<T>
++    {
++        public int Page { get; init; }
++        public int PageSize { get; init; }
++        public long Total { get; init; }
++        public IEnumerable<T> Items { get; init; } = new List<T>();
++    }
++}
+*** End Patch
+
+*** Begin Patch
+*** Add File: src/Modules/Cadastros/Module.Cadastros.Application/UseCases/ListEmpresasUseCase.cs
++using System.Linq;
++using System.Threading.Tasks;
++using Module.Cadastros.Application.DTOs;
++using Module.Cadastros.Domain.Repositories;
++
++namespace Module.Cadastros.Application.UseCases
++{
++    public class ListEmpresasUseCase
++    {
++        private readonly IEmpresaRepository _repo;
++
++        public ListEmpresasUseCase(IEmpresaRepository repo) => _repo = repo;
++
++        public async Task<PagedResult<Module.Cadastros.Application.DTOs.EmpresaDto>> ExecuteAsync(EmpresaQuery query)
++        {
++            var (items, total) = await _repo.QueryAsync(query.Cnpj, query.Uf, query.Municipio, query.Nome, query.Page, query.PageSize);
++
++            var dtos = items.Select(e => new Module.Cadastros.Application.DTOs.EmpresaDto
++            {
++                Id = e.Id,
++                Cnpj = e.Cnpj,
++                Nome = e.Nome,
++                Fantasia = e.Fantasia,
++                Situacao = e.Situacao,
++                Municipio = e.Municipio,
++                Uf = e.Uf,
++                Abertura = e.Abertura,
++                AtividadePrincipalJson = e.AtividadePrincipalJson
++            });
++
++            return new PagedResult<Module.Cadastros.Application.DTOs.EmpresaDto>
++            {
++                Page = query.Page,
++                PageSize = query.PageSize,
++                Total = total,
++                Items = dtos
++            };
++        }
++    }
++}
+*** End Patch
+
+*** Begin Patch
+*** Add File: src/Modules/Cadastros/Module.Cadastros.Domain/Repositories/IEmpresaRepository.cs
++using System.Collections.Generic;
++using System.Threading.Tasks;
++using Module.Cadastros.Domain.Entities;
++
++namespace Module.Cadastros.Domain.Repositories
++{
++    public interface IEmpresaRepository
++    {
++        Task<Empresa?> GetByCnpjAsync(string cnpj);
++        Task UpsertAsync(Empresa empresa);
++        Task<(IEnumerable<Empresa> Items, long Total)> QueryAsync(string? cnpj, string? uf, string? municipio, string? nome, int page, int pageSize);
++    }
++}
+*** End Patch
+
+*** Begin Patch
+*** Add File: src/Modules/Cadastros/Module.Cadastros.Domain/ValueObjects/Cnpj.cs
++using System;
++using System.Text.RegularExpressions;
++
++namespace Module.Cadastros.Domain.ValueObjects
++{
++    public sealed class Cnpj
++    {
++        public string Value { get; }
++
++        private Cnpj(string value) => Value = value;
++
++        public static Cnpj Normalize(string input)
++        {
++            if (input is null) throw new ArgumentNullException(nameof(input));
++            var cleaned = Regex.Replace(input, "\\D", "");
++            if (!IsValid(cleaned)) throw new ArgumentException("CNPJ inválido", nameof(input));
++            return new Cnpj(cleaned);
++        }
++
++        public static bool IsValid(string input)
++        {
++            if (string.IsNullOrWhiteSpace(input)) return false;
++            var v = Regex.Replace(input, "\\D", "");
++            if (v.Length != 14) return false;
++
++            var invalids = new[] { "00000000000000", "11111111111111", "22222222222222", "33333333333333",
++                                   "44444444444444", "55555555555555", "66666666666666", "77777777777777",
++                                   "88888888888888", "99999999999999" };
++            if (Array.Exists(invalids, x => x == v)) return false;
++
++            var baseDigits = v.Substring(0, 12);
++            var calc = CalculateDigits(baseDigits);
++            return v.EndsWith(calc);
++        }
++
++        private static string CalculateDigits(string baseDigits)
++        {
++            int[] mult1 = {5,4,3,2,9,8,7,6,5,4,3,2};
++            int[] mult2 = {6,5,4,3,2,9,8,7,6,5,4,3,2};
++
++            int sum = 0;
++            for (int i = 0; i < 12; i++) sum += (baseDigits[i] - '0') * mult1[i];
++            int rem = sum % 11;
++            int d1 = rem < 2 ? 0 : 11 - rem;
++
++            var temp = baseDigits + d1.ToString();
++            sum = 0;
++            for (int i = 0; i < 13; i++) sum += (temp[i] - '0') * mult2[i];
++            rem = sum % 11;
++            int d2 = rem < 2 ? 0 : 11 - rem;
++
++            return $"{d1}{d2}";
++        }
++
++        public override string ToString() => Value;
++    }
++}
+*** End Patch
+
+*** Begin Patch
+*** Add File: src/Modules/Cadastros/Module.Cadastros.Infrastructure/Repositories/EmpresaRepository.cs
++using System.Linq;
++using System.Threading.Tasks;
++using System.Collections.Generic;
++using Microsoft.EntityFrameworkCore;
++using Module.Cadastros.Domain.Entities;
++using Module.Cadastros.Domain.Repositories;
++using Module.Cadastros.Infrastructure.Persistence;
++
++namespace Module.Cadastros.Infrastructure.Repositories
++{
++    public partial class EmpresaRepository : IEmpresaRepository
++    {
++        private readonly CadastrosDbContext _db;
++        public EmpresaRepository(CadastrosDbContext db) => _db = db;
++
++        public async Task<Empresa?> GetByCnpjAsync(string cnpj)
++        {
++            var norm = cnpj.Replace(".", "").Replace("/", "").Replace("-", "");
++            return await _db.Empresas.SingleOrDefaultAsync(e => e.Cnpj == norm);
++        }
++
++        public async Task UpsertAsync(Empresa empresa)
++        {
++            var existing = await _db.Empresas.SingleOrDefaultAsync(e => e.Cnpj == empresa.Cnpj);
++            if (existing == null) _db.Empresas.Add(empresa);
++            else _db.Entry(existing).CurrentValues.SetValues(empresa);
++            await _db.SaveChangesAsync();
++        }
++
++        public async Task<(IEnumerable<Empresa> Items, long Total)> QueryAsync(string? cnpj, string? uf, string? municipio, string? nome, int page, int pageSize)
++        {
++            var q = _db.Empresas.AsQueryable();
++
++            if (!string.IsNullOrWhiteSpace(cnpj))
++            {
++                var norm = cnpj.Replace(".", "").Replace("/", "").Replace("-", "");
++                q = q.Where(e => e.Cnpj.Contains(norm));
++            }
++            if (!string.IsNullOrWhiteSpace(uf))
++                q = q.Where(e => e.Uf == uf);
++            if (!string.IsNullOrWhiteSpace(municipio))
++                q = q.Where(e => EF.Functions.ILike(e.Municipio, $"%{municipio}%"));
++            if (!string.IsNullOrWhiteSpace(nome))
++                q = q.Where(e => EF.Functions.ILike(e.Nome, $"%{nome}%"));
++
++            var total = await q.LongCountAsync();
++            var items = await q.OrderBy(e => e.Nome)
++                               .Skip((page - 1) * pageSize)
++                               .Take(pageSize)
++                               .ToListAsync();
++
++            return (items, total);
++        }
++    }
++}
+*** End Patch
+
+*** Begin Patch
+*** Add File: src/Modules/Cadastros/Module.Cadastros.Infrastructure/Receitaws/ReceitawsClient.cs
++using System;
++using System.Net.Http;
++using System.Text.Json;
++using System.Threading.Tasks;
++using Microsoft.Extensions.Caching.Memory;
++using Module.Cadastros.Application.DTOs;
++using Module.Cadastros.Application.Interfaces;
++
++namespace Module.Cadastros.Infrastructure.Receitaws
++{
++    public class ReceitawsClient : IReceitawsClient
++    {
++        private readonly IHttpClientFactory _httpFactory;
++        private readonly IMemoryCache _cache;
++        private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
++        private readonly TimeSpan _cacheTtl = TimeSpan.FromHours(6);
++
++        public ReceitawsClient(IHttpClientFactory httpFactory, IMemoryCache cache)
++        {
++            _httpFactory = httpFactory;
++            _cache = cache;
++        }
++
++        public async Task<EmpresaDto?> GetByCnpjAsync(string cnpj)
++        {
++            var key = $"receitaws:{cnpj}";
++            if (_cache.TryGetValue<EmpresaDto>(key, out var cached)) return cached;
++
++            var client = _httpFactory.CreateClient("receitaws");
++            var url = $"v1/cnpj/{cnpj}";
++            using var resp = await client.GetAsync(url);
++            if (!resp.IsSuccessStatusCode) return null;
++            var json = await resp.Content.ReadAsStringAsync();
++            using var doc = JsonDocument.Parse(json);
++            var root = doc.RootElement;
++
++            var dto = new EmpresaDto
++            {
++                Cnpj = root.GetProperty("cnpj").GetString() ?? cnpj,
++                Nome = root.GetProperty("nome").GetString() ?? string.Empty,
++                Fantasia = root.TryGetProperty("fantasia", out var f) && f.ValueKind != JsonValueKind.Null ? f.GetString() : null,
++                Situacao = root.TryGetProperty("situacao", out var s) && s.ValueKind != JsonValueKind.Null ? s.GetString() : null,
++                Municipio = root.TryGetProperty("municipio", out var m) && m.ValueKind != JsonValueKind.Null ? m.GetString() : null,
++                Uf = root.TryGetProperty("uf", out var u) && u.ValueKind != JsonValueKind.Null ? u.GetString() : null,
++                Abertura = root.TryGetProperty("abertura", out var a) && a.ValueKind == JsonValueKind.String && DateTime.TryParse(a.GetString(), out var dt) ? dt : null,
++                AtividadePrincipalJson = root.TryGetProperty("atividade_principal", out var ap) ? ap.GetRawText() : null,
++                AtividadesSecundariasJson = root.TryGetProperty("atividades_secundarias", out var asd) ? asd.GetRawText() : null,
++                QsaJson = root.TryGetProperty("qsa", out var qsa) ? qsa.GetRawText() : null
++            };
++
++            _cache.Set(key, dto, _cacheTtl);
++            return dto;
++        }
++    }
++}
+*** End Patch
+
+*** Begin Patch
+*** Add File: src/Modules/Cadastros/Module.Cadastros.Api/Controllers/EmpresasController.cs
++using System.Threading.Tasks;
++using Microsoft.AspNetCore.Mvc;
++using Module.Cadastros.Application.UseCases;
++using Module.Cadastros.Application.DTOs;
++
++namespace Module.Cadastros.Api.Controllers
++{
++    [ApiController]
++    [Route("api/cadastros/empresas")]
++    public class EmpresasController : ControllerBase
++    {
++        private readonly ImportEmpresaUseCase _importUseCase;
++        private readonly ListEmpresasUseCase _listUseCase;
++
++        public EmpresasController(ImportEmpresaUseCase importUseCase, ListEmpresasUseCase listUseCase)
++        {
++            _importUseCase = importUseCase;
++            _listUseCase = listUseCase;
++        }
++
++        [HttpPost("import/{cnpj}")]
++        public async Task<IActionResult> Import(string cnpj)
++        {
++            var result = await _importUseCase.ExecuteAsync(cnpj);
++            if (result == null) return NotFound();
++            return Ok(result);
++        }
++
++        [HttpGet]
++        public async Task<IActionResult> Get([FromQuery] EmpresaQuery query)
++        {
++            var page = await _listUseCase.ExecuteAsync(query);
++            return Ok(page);
++        }
++    }
++}
+*** End Patch
+
+*** Begin Patch
+*** Add File: tests/Module.Cadastros.Tests/CnpjTests.cs
++using Xunit;
++using Module.Cadastros.Domain.ValueObjects;
++
++namespace Module.Cadastros.Tests
++{
++    public class CnpjTests
++    {
++        [Fact]
++        public void Normalize_RemovesMask_And_Validates()
++        {
++            var raw = "62.934.252/0001-45";
++            var v = Cnpj.Normalize(raw);
++            Assert.Equal("62934252000145", v.Value);
++        }
++
++        [Theory]
++        [InlineData("00000000000000")]
++        [InlineData("11111111111111")]
++        public void IsValid_Rejects_InvalidPatterns(string candidate)
++        {
++            Assert.False(Cnpj.IsValid(candidate));
++        }
++    }
++}
+*** End Patch
+
+*** Begin Patch
+*** Add File: tests/Module.Cadastros.Tests/ListEmpresasUseCaseTests.cs
++using System.Collections.Generic;
++using System.Linq;
++using System.Threading.Tasks;
++using Moq;
++using Xunit;
++using Module.Cadastros.Domain.Repositories;
++using Module.Cadastros.Domain.Entities;
++using Module.Cadastros.Application.UseCases;
++using Module.Cadastros.Application.DTOs;
++
++namespace Module.Cadastros.Tests
++{
++    public class ListEmpresasUseCaseTests
++    {
++        [Fact]
++        public async Task ExecuteAsync_ReturnsPagedResult_WithFilters()
++        {
++            var repoMock = new Mock<IEmpresaRepository>();
++            var sample = new List<Empresa> { new Empresa("62934252000145", "Yamaha") };
++            repoMock.Setup(r => r.QueryAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), 1, 20))
++                    .ReturnsAsync((sample.AsEnumerable(), 1L));
++
++            var useCase = new ListEmpresasUseCase(repoMock.Object);
++            var result = await useCase.ExecuteAsync(new EmpresaQuery { Nome = "Yamaha", Page = 1, PageSize = 20 });
++
++            Assert.Equal(1, result.Total);
++            Assert.Single(result.Items);
++            Assert.Equal("Yamaha", result.Items.First().Nome);
++        }
++    }
++}
+*** End Patch

@@ -1,0 +1,499 @@
+```diff
+*** Begin Patch
+*** Add File: EmpresasIntegration/EmpresasIntegration.csproj
++<Project Sdk="Microsoft.NET.Sdk.Web">
++
++  <PropertyGroup>
++    <TargetFramework>net7.0</TargetFramework>
++    <Nullable>enable</Nullable>
++    <ImplicitUsings>enable</ImplicitUsings>
++  </PropertyGroup>
++
++  <ItemGroup>
++    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.0" />
++    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.0">
++      <PrivateAssets>all</PrivateAssets>
++    </PackageReference>
++    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="7.0.0" />
++  </ItemGroup>
++
++</Project>
+*** End Patch
+```
+
+```diff
+*** Begin Patch
+*** Add File: EmpresasIntegration/appsettings.json
++{
++  "ConnectionStrings": {
++    "DefaultConnection": "Host=127.0.0.1;Port=5435;Database=erp;Username=postgres;Password=postgres"
++  },
++  "Logging": {
++    "LogLevel": {
++      "Default": "Information",
++      "Microsoft": "Warning",
++      "Microsoft.Hosting.Lifetime": "Information"
++    }
++  },
++  "AllowedHosts": "*"
++}
+*** End Patch
+```
+
+```diff
+*** Begin Patch
+*** Add File: EmpresasIntegration/Program.cs
++using EmpresasIntegration.Data;
++using EmpresasIntegration.Services;
++using Microsoft.EntityFrameworkCore;
++
++var builder = WebApplication.CreateBuilder(args);
++
++builder.Services.AddControllers();
++builder.Services.AddEndpointsApiExplorer();
++builder.Services.AddSwaggerGen();
++
++builder.Services.AddDbContext<AppDbContext>(options =>
++    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
++
++builder.Services.AddHttpClient();
++builder.Services.AddScoped<ReceitawsService>();
++
++var app = builder.Build();
++
++if (app.Environment.IsDevelopment())
++{
++    app.UseSwagger();
++    app.UseSwaggerUI();
++}
++
++app.UseHttpsRedirection();
++app.MapControllers();
++app.Run();
+*** End Patch
+```
+
+```diff
+*** Begin Patch
+*** Add File: EmpresasIntegration/Models/Empresa.cs
++using System;
++using System.ComponentModel.DataAnnotations;
++
++namespace EmpresasIntegration.Models
++{
++    public class Empresa
++    {
++        [Key]
++        public int Id { get; set; }
++
++        [Required]
++        [MaxLength(18)]
++        public string Cnpj { get; set; } = string.Empty;
++
++        [MaxLength(250)]
++        public string? Nome { get; set; }
++
++        [MaxLength(250)]
++        public string? Fantasia { get; set; }
++
++        [MaxLength(50)]
++        public string? Situacao { get; set; }
++
++        [MaxLength(50)]
++        public string? Tipo { get; set; }
++
++        public string? NaturezaJuridica { get; set; }
++
++        public string? AtividadePrincipalJson { get; set; }
++
++        public string? AtividadesSecundariasJson { get; set; }
++
++        public string? QsaJson { get; set; }
++
++        [MaxLength(100)]
++        public string? Logradouro { get; set; }
++
++        [MaxLength(20)]
++        public string? Numero { get; set; }
++
++        [MaxLength(100)]
++        public string? Complemento { get; set; }
++
++        [MaxLength(100)]
++        public string? Bairro { get; set; }
++
++        [MaxLength(100)]
++        public string? Municipio { get; set; }
++
++        [MaxLength(2)]
++        public string? Uf { get; set; }
++
++        [MaxLength(20)]
++        public string? Cep { get; set; }
++
++        [MaxLength(100)]
++        public string? Email { get; set; }
++
++        [MaxLength(100)]
++        public string? Telefone { get; set; }
++
++        public DateTime? Abertura { get; set; }
++        public DateTime? DataSituacao { get; set; }
++
++        [MaxLength(50)]
++        public string? UltimaAtualizacao { get; set; }
++
++        public decimal? CapitalSocial { get; set; }
++
++        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
++        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
++    }
++}
+*** End Patch
+```
+
+```diff
+*** Begin Patch
+*** Add File: EmpresasIntegration/Data/AppDbContext.cs
++using EmpresasIntegration.Models;
++using Microsoft.EntityFrameworkCore;
++
++namespace EmpresasIntegration.Data
++{
++    public class AppDbContext : DbContext
++    {
++        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
++
++        public DbSet<Empresa> Empresas { get; set; } = null!;
++
++        protected override void OnModelCreating(ModelBuilder modelBuilder)
++        {
++            modelBuilder.Entity<Empresa>()
++                .HasIndex(e => e.Cnpj)
++                .IsUnique();
++        }
++    }
++}
+*** End Patch
+```
+
+```diff
+*** Begin Patch
+*** Add File: EmpresasIntegration/Services/ReceitawsService.cs
++using System;
++using System.Net.Http;
++using System.Text.Json;
++using System.Threading.Tasks;
++using EmpresasIntegration.Data;
++using EmpresasIntegration.Models;
++using Microsoft.EntityFrameworkCore;
++
++namespace EmpresasIntegration.Services
++{
++    public class ReceitawsService
++    {
++        private readonly IHttpClientFactory _httpFactory;
++        private readonly AppDbContext _db;
++
++        public ReceitawsService(IHttpClientFactory httpFactory, AppDbContext db)
++        {
++            _httpFactory = httpFactory;
++            _db = db;
++        }
++
++        public async Task<Empresa> FetchAndSaveAsync(string cnpj)
++        {
++            var client = _httpFactory.CreateClient();
++            var url = $"https://www.receitaws.com.br/v1/cnpj/{cnpj}";
++            using var resp = await client.GetAsync(url);
++            resp.EnsureSuccessStatusCode();
++            var json = await resp.Content.ReadAsStringAsync();
++
++            using var doc = JsonDocument.Parse(json);
++            var root = doc.RootElement;
++
++            var cnpjRaw = TryGet(root, "cnpj");
++            if (string.IsNullOrWhiteSpace(cnpjRaw))
++                throw new InvalidOperationException("Resposta da API não contém CNPJ.");
++
++            var empresa = await _db.Empresas.SingleOrDefaultAsync(e => e.Cnpj == cnpjRaw);
++            var now = DateTime.UtcNow;
++            if (empresa == null)
++            {
++                empresa = new Empresa { Cnpj = cnpjRaw, CreatedAt = now };
++                _db.Empresas.Add(empresa);
++            }
++
++            empresa.Nome = TryGet(root, "nome");
++            empresa.Fantasia = TryGet(root, "fantasia");
++            empresa.Situacao = TryGet(root, "situacao");
++            empresa.Tipo = TryGet(root, "tipo");
++            empresa.NaturezaJuridica = TryGet(root, "natureza_juridica");
++            empresa.Logradouro = TryGet(root, "logradouro");
++            empresa.Numero = TryGet(root, "numero");
++            empresa.Complemento = TryGet(root, "complemento");
++            empresa.Bairro = TryGet(root, "bairro");
++            empresa.Municipio = TryGet(root, "municipio");
++            empresa.Uf = TryGet(root, "uf");
++            empresa.Cep = TryGet(root, "cep");
++            empresa.Email = TryGet(root, "email");
++            empresa.Telefone = TryGet(root, "telefone");
++            empresa.UltimaAtualizacao = TryGet(root, "ultima_atualizacao");
++            empresa.Abertura = ParseDate(TryGet(root, "abertura"));
++            empresa.DataSituacao = ParseDate(TryGet(root, "data_situacao"));
++            empresa.CapitalSocial = ParseDecimal(TryGet(root, "capital_social"));
++
++            if (root.TryGetProperty("atividade_principal", out var ap)) empresa.AtividadePrincipalJson = ap.GetRawText();
++            if (root.TryGetProperty("atividades_secundarias", out var asd)) empresa.AtividadesSecundariasJson = asd.GetRawText();
++            if (root.TryGetProperty("qsa", out var qsa)) empresa.QsaJson = qsa.GetRawText();
++
++            empresa.UpdatedAt = now;
++
++            await _db.SaveChangesAsync();
++
++            return empresa;
++        }
++
++        private static string? TryGet(JsonElement root, string prop)
++        {
++            return root.TryGetProperty(prop, out var p) && p.ValueKind != JsonValueKind.Null ? p.GetString() : null;
++        }
++
++        private static DateTime? ParseDate(string? s)
++        {
++            if (string.IsNullOrWhiteSpace(s)) return null;
++            if (DateTime.TryParse(s, out var dt)) return dt;
++            if (DateTime.TryParseExact(s, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out dt)) return dt;
++            return null;
++        }
++
++        private static decimal? ParseDecimal(string? s)
++        {
++            if (string.IsNullOrWhiteSpace(s)) return null;
++            if (decimal.TryParse(s, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d)) return d;
++            var t = s.Replace(".", "").Replace(",", ".");
++            if (decimal.TryParse(t, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out d)) return d;
++            return null;
++        }
++    }
++}
+*** End Patch
+```
+
+```diff
+*** Begin Patch
+*** Add File: EmpresasIntegration/Controllers/EmpresasController.cs
++using System.Threading.Tasks;
++using EmpresasIntegration.Services;
++using Microsoft.AspNetCore.Mvc;
++
++namespace EmpresasIntegration.Controllers
++{
++    [ApiController]
++    [Route("api/[controller]")]
++    public class EmpresasController : ControllerBase
++    {
++        private readonly ReceitawsService _receitaws;
++
++        public EmpresasController(ReceitawsService receitaws)
++        {
++            _receitaws = receitaws;
++        }
++
++        [HttpPost("import/{cnpj}")]
++        public async Task<IActionResult> ImportCnpj(string cnpj)
++        {
++            var empresa = await _receitaws.FetchAndSaveAsync(cnpj);
++            return Ok(new { empresa.Id, empresa.Cnpj, empresa.Nome });
++        }
++    }
++}
+*** End Patch
+```
+
+```diff
+*** Begin Patch
+*** Add File: EmpresasIntegration/Migrations/20251103_InitialCreate.cs
++using System;
++using Microsoft.EntityFrameworkCore.Migrations;
++
++#nullable disable
++
++namespace EmpresasIntegration.Migrations
++{
++    public partial class InitialCreate : Migration
++    {
++        protected override void Up(MigrationBuilder migrationBuilder)
++        {
++            migrationBuilder.CreateTable(
++                name: "Empresas",
++                columns: table => new
++                {
++                    Id = table.Column<int>(type: "integer", nullable: false)
++                        .Annotation("Npgsql:ValueGenerationStrategy", Npgsql.EntityFrameworkCore.PostgreSQL.Metadata.NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
++                    Cnpj = table.Column<string>(type: "character varying(18)", maxLength: 18, nullable: false),
++                    Nome = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: true),
++                    Fantasia = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: true),
++                    Situacao = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
++                    Tipo = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
++                    NaturezaJuridica = table.Column<string>(type: "text", nullable: true),
++                    AtividadePrincipalJson = table.Column<string>(type: "text", nullable: true),
++                    AtividadesSecundariasJson = table.Column<string>(type: "text", nullable: true),
++                    QsaJson = table.Column<string>(type: "text", nullable: true),
++                    Logradouro = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
++                    Numero = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
++                    Complemento = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
++                    Bairro = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
++                    Municipio = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
++                    Uf = table.Column<string>(type: "character varying(2)", maxLength: 2, nullable: true),
++                    Cep = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
++                    Email = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
++                    Telefone = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
++                    Abertura = table.Column<DateTime>(type: "timestamp without time zone", nullable: true),
++                    DataSituacao = table.Column<DateTime>(type: "timestamp without time zone", nullable: true),
++                    UltimaAtualizacao = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
++                    CapitalSocial = table.Column<decimal>(type: "numeric", nullable: true),
++                    CreatedAt = table.Column<DateTime>(type: "timestamp without time zone", nullable: false),
++                    UpdatedAt = table.Column<DateTime>(type: "timestamp without time zone", nullable: false)
++                },
++                constraints: table =>
++                {
++                    table.PrimaryKey("PK_Empresas", x => x.Id);
++                });
++
++            migrationBuilder.CreateIndex(
++                name: "IX_Empresas_Cnpj",
++                table: "Empresas",
++                column: "Cnpj",
++                unique: true);
++        }
++
++        protected override void Down(MigrationBuilder migrationBuilder)
++        {
++            migrationBuilder.DropTable(
++                name: "Empresas");
++        }
++    }
++}
+*** End Patch
+```
+
+```diff
+*** Begin Patch
+*** Add File: EmpresasIntegration/Migrations/EmpresasIntegrationModelSnapshot.cs
++using System;
++using Microsoft.EntityFrameworkCore;
++using Microsoft.EntityFrameworkCore.Infrastructure;
++using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
++using EmpresasIntegration.Data;
++
++#nullable disable
++
++namespace EmpresasIntegration.Migrations
++{
++    [DbContext(typeof(AppDbContext))]
++    partial class EmpresasIntegrationModelSnapshot : ModelSnapshot
++    {
++        protected override void BuildModel(ModelBuilder modelBuilder)
++        {
++            modelBuilder
++                .HasAnnotation("Relational:MaxIdentifierLength", 63)
++                .HasAnnotation("ProductVersion", "7.0.0")
++                .HasAnnotation("Npgsql:ValueGenerationStrategy", Npgsql.EntityFrameworkCore.PostgreSQL.Metadata.NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
++
++            modelBuilder.Entity("EmpresasIntegration.Models.Empresa", b =>
++            {
++                b.Property<int>("Id")
++                    .ValueGeneratedOnAdd()
++                    .HasColumnType("integer")
++                    .HasAnnotation("Npgsql:ValueGenerationStrategy", Npgsql.EntityFrameworkCore.PostgreSQL.Metadata.NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
++
++                b.Property<string>("AtividadePrincipalJson")
++                    .HasColumnType("text");
++
++                b.Property<string>("AtividadesSecundariasJson")
++                    .HasColumnType("text");
++
++                b.Property<string>("Bairro")
++                    .HasColumnType("character varying(100)")
++                    .HasMaxLength(100);
++
++                b.Property<string>("CapitalSocial")
++                    .HasColumnType("text");
++
++                b.Property<decimal?>("CapitalSocial0")
++                    .HasColumnType("numeric");
++
++                b.Property<string>("Cep")
++                    .HasColumnType("character varying(20)")
++                    .HasMaxLength(20);
++
++                b.Property<DateTime?>("DataSituacao")
++                    .HasColumnType("timestamp without time zone");
++
++                b.Property<string>("Email")
++                    .HasColumnType("character varying(100)")
++                    .HasMaxLength(100);
++
++                b.Property<string>("Fantasia")
++                    .HasColumnType("character varying(250)")
++                    .HasMaxLength(250);
++
++                b.Property<string>("Ficticio")
++                    .HasColumnType("text");
++
++                b.Property<string>("Logradouro")
++                    .HasColumnType("character varying(100)")
++                    .HasMaxLength(100);
++
++                b.Property<string>("Municipio")
++                    .HasColumnType("character varying(100)")
++                    .HasMaxLength(100);
++
++                b.Property<string>("NaturezaJuridica")
++                    .HasColumnType("text");
++
++                b.Property<string>("Nome")
++                    .HasColumnType("character varying(250)")
++                    .HasMaxLength(250);
++
++                b.Property<string>("Numero")
++                    .HasColumnType("character varying(20)")
++                    .HasMaxLength(20);
++
++                b.Property<string>("QsaJson")
++                    .HasColumnType("text");
++
++                b.Property<string>("Situacao")
++                    .HasColumnType("character varying(50)")
++                    .HasMaxLength(50);
++
++                b.Property<string>("Telefone")
++                    .HasColumnType("character varying(100)")
++                    .HasMaxLength(100);
++
++                b.Property<string>("Tipo")
++                    .HasColumnType("character varying(50)")
++                    .HasMaxLength(50);
++
++                b.Property<string>("Uf")
++                    .HasColumnType("character varying(2)")
++                    .HasMaxLength(2);
++
++                b.Property<DateTime>("CreatedAt")
++                    .HasColumnType("timestamp without time zone");
++
++                b.Property<DateTime>("UpdatedAt")
++                    .HasColumnType("timestamp without time zone");
++
++                b.HasKey("Id");
++
++                b.HasIndex("Cnpj")
++                    .IsUnique();
++
++                b.ToTable("Empresas");
++            });
++        }
++    }
++}
+*** End Patch

@@ -1,0 +1,16 @@
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\bin\Debug\net9.0\Module.Cadastros.Application.deps.json
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\bin\Debug\net9.0\Module.Cadastros.Application.dll
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\bin\Debug\net9.0\Module.Cadastros.Application.pdb
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\bin\Debug\net9.0\Module.Cadastros.Domain.dll
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\bin\Debug\net9.0\Module.Cadastros.Domain.pdb
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\obj\Debug\net9.0\Module.Cadastros.Application.csproj.AssemblyReference.cache
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\obj\Debug\net9.0\Module.Cadastros.Application.GeneratedMSBuildEditorConfig.editorconfig
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\obj\Debug\net9.0\Module.Cadastros.Application.AssemblyInfoInputs.cache
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\obj\Debug\net9.0\Module.Cadastros.Application.AssemblyInfo.cs
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\obj\Debug\net9.0\Module.Cadastros.Application.csproj.CoreCompileInputs.cache
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\obj\Debug\net9.0\Module.Cadastros.Application.sourcelink.json
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\obj\Debug\net9.0\Module.C.3C93BC76.Up2Date
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\obj\Debug\net9.0\Module.Cadastros.Application.dll
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\obj\Debug\net9.0\refint\Module.Cadastros.Application.dll
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\obj\Debug\net9.0\Module.Cadastros.Application.pdb
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Application\obj\Debug\net9.0\ref\Module.Cadastros.Application.dll

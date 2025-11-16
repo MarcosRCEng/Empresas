@@ -1,0 +1,12 @@
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Domain\bin\Debug\net9.0\Module.Cadastros.Domain.deps.json
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Domain\bin\Debug\net9.0\Module.Cadastros.Domain.dll
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Domain\bin\Debug\net9.0\Module.Cadastros.Domain.pdb
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Domain\obj\Debug\net9.0\Module.Cadastros.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Domain\obj\Debug\net9.0\Module.Cadastros.Domain.AssemblyInfoInputs.cache
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Domain\obj\Debug\net9.0\Module.Cadastros.Domain.AssemblyInfo.cs
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Domain\obj\Debug\net9.0\Module.Cadastros.Domain.csproj.CoreCompileInputs.cache
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Domain\obj\Debug\net9.0\Module.Cadastros.Domain.sourcelink.json
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Domain\obj\Debug\net9.0\Module.Cadastros.Domain.dll
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Domain\obj\Debug\net9.0\refint\Module.Cadastros.Domain.dll
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Domain\obj\Debug\net9.0\Module.Cadastros.Domain.pdb
+C:\Fontes\Empresas\src\Modules\Cadastros\Module.Cadastros.Domain\obj\Debug\net9.0\ref\Module.Cadastros.Domain.dll

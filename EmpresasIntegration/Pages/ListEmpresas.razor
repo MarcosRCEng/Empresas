@@ -1,0 +1,91 @@
+﻿@page "/empresas"
+@inject IHttpClientFactory ClientFactory
+@inject NavigationManager NavigationManager
+@using System.Net.Http.Json
+
+<h3>Lista de Empresas</h3>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-danger">@ErrorMessage</div>
+}
+else if (Empresas == null)
+{
+    <p>Carregando...</p>
+}
+else if (Empresas.Count == 0)
+{
+    <p>Nenhuma empresa encontrada.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>CNPJ</th>
+                <th>Nome</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var empresa in Empresas)
+            {
+                <tr>
+                    <td>@empresa.Id</td>
+                    <td>@empresa.Cnpj</td>
+                    <td>@empresa.Nome</td>
+                    <td>
+                        <button class="btn btn-info btn-sm me-1" @onclick="() => ViewEmpresa(empresa.Id)">Consultar</button>
+                        <button class="btn btn-warning btn-sm" @onclick="() => EditEmpresa(empresa.Id)">Editar</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<a class="btn btn-primary" href="/empresas/import">Importar nova empresa</a>
+
+@code {
+    private List<EmpresaDto>? Empresas;
+    private string? ErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var client = ClientFactory.CreateClient("ApiClient");
+
+            // Constroi sempre uma URI absoluta e previsível
+            // 1) Se o client tem BaseAddress, usa-a como base
+            // 2) Se não, usa um fallback explícito (ajuste a porta se sua API estiver em outra)
+            var apiBase = client.BaseAddress ?? new Uri("http://localhost:5000/");
+            var absoluteUri = new Uri(apiBase, "api/empresas");
+
+            // Monta e envia a requisição explicitamente (mais robusto que depender de sobrecargas relativas)
+            using var request = new HttpRequestMessage(HttpMethod.Get, absoluteUri);
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+            response.EnsureSuccessStatusCode();
+
+            Empresas = await response.Content.ReadFromJsonAsync<List<EmpresaDto>>() ?? new List<EmpresaDto>();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Erro ao carregar empresas: {ex.Message}";
+            Empresas = new List<EmpresaDto>();
+            Console.WriteLine(ex.ToString());
+        }
+    }
+
+    private void ViewEmpresa(int id) => NavigationManager.NavigateTo($"/empresas/{id}");
+    private void EditEmpresa(int id) => NavigationManager.NavigateTo($"/empresa/editar/{id}");
+
+    public class EmpresaDto
+    {
+        public int Id { get; set; }
+        public string? Cnpj { get; set; }
+        public string? Nome { get; set; }
+    }
+}
