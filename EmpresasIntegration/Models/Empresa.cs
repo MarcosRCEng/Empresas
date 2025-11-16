@@ -25,12 +25,32 @@ namespace EmpresasIntegration.Models
         public string? Tipo { get; set; }
 
         public string? NaturezaJuridica { get; set; }
+        // Propriedades novas para compatibilizar com ReceitaWS
+        public string? CnpjNormalized { get; set; }         // 14 dígitos
 
-        public string? AtividadePrincipalJson { get; set; }
+        public string? AtividadePrincipalJson { get; set; } // jsonb
 
-        public string? AtividadesSecundariasJson { get; set; }
+        public string? AtividadesSecundariasJson { get; set; } // jsonb
 
-        public string? QsaJson { get; set; }
+        public string? QsaJson { get; set; }                // jsonb
+
+        public string? SimplesJson { get; set; }            // jsonb
+
+        public string? SimeiJson { get; set; }              // jsonb
+
+        public string? ExtraJson { get; set; }              // jsonb
+
+        public string? BillingJson { get; set; }            // jsonb
+
+        public string? Status { get; set; }
+
+        public string? Porte { get; set; }
+
+        public string? MotivoSituacao { get; set; }
+
+        public string? SituacaoEspecial { get; set; }
+
+        public DateTime? DataSituacaoEspecial { get; set; }
 
         [MaxLength(100)]
         public string? Logradouro { get; set; }
@@ -63,7 +83,7 @@ namespace EmpresasIntegration.Models
         public DateTime? DataSituacao { get; set; }
 
         [MaxLength(50)]
-        public string? UltimaAtualizacao { get; set; }
+        public DateTime? UltimaAtualizacao { get; set; }
 
         public decimal? CapitalSocial { get; set; }
 
