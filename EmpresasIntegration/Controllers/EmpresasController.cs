@@ -100,7 +100,7 @@ namespace EmpresasIntegration.Controllers
 
         public class EmpresaDto
         {
-            public string? Cnpj { get; set; }
+            public string? Cnpj { get; set; } = string.Empty;
             public string? Nome { get; set; }
             public string? Logradouro { get; set; }
             public string? Numero { get; set; }
