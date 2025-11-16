@@ -1,9 +1,103 @@
 ﻿@page "/"
+@inject IHttpClientFactory ClientFactory
+@inject NavigationManager Navigation
+@using System.Net.Http.Json
 
 <PageTitle>Index</PageTitle>
 
 <h1>Hello, world!</h1>
+<p>Welcome to your new app.</p>
 
-Welcome to your new app.
+<div class="card mb-3" style="max-width:720px">
+    <div class="card-body">
+        <h5 class="card-title">Consultar Empresa por CNPJ</h5>
+
+        <div class="row g-2 align-items-center">
+            <div class="col-auto" style="min-width:300px">
+                <input class="form-control" @bind="InputCnpj" placeholder="CNPJ (ex: 00.000.000/0001-00)" />
+                @if (!string.IsNullOrEmpty(ValidationMessage))
+                {
+                    <div class="text-danger small mt-1">@ValidationMessage</div>
+                }
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary" @onclick="OnConsultar" disabled="@IsBusy">
+                    @(IsBusy ? "Consultando..." : "Consultar")
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <SurveyPrompt Title="How is Blazor working for you?" />
+
+@code {
+    private string InputCnpj { get; set; } = string.Empty;
+    private bool IsBusy { get; set; } = false;
+    private string? ValidationMessage { get; set; }
+
+    private HttpClient ApiClient => ClientFactory.CreateClient("ApiClient");
+
+    private async Task OnConsultar()
+    {
+        ValidationMessage = null;
+        var norm = NormalizeCnpj(InputCnpj);
+        if (string.IsNullOrWhiteSpace(norm) || norm.Length != 14)
+        {
+            ValidationMessage = "Informe um CNPJ válido com 14 dígitos.";
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            // Ajuste este endpoint conforme sua API. Exemplo esperado: GET api/empresas/cnpj/{cnpj}
+            var url = $"api/empresas/cnpj/{norm}";
+            EmpresaDto? dto = null;
+            try
+            {
+                dto = await ApiClient.GetFromJsonAsync<EmpresaDto>(url);
+            }
+            catch (HttpRequestException)
+            {
+                // endpoint pode devolver 404 ou não existir; tratar abaixo
+                dto = null;
+            }
+
+            if (dto != null && dto.Id > 0)
+            {
+                // Navega para detalhes da empresa encontrada
+                Navigation.NavigateTo($"/empresas/{dto.Id}");
+                return;
+            }
+
+            // Se a API não retornou a empresa, navegar para a lista com query (opcional)
+            // Você pode implementar a listagem para aceitar ?cnpj=xxxxx e filtrar
+            Navigation.NavigateTo($"/empresas?cnpj={norm}");
+
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    // normalize client-side: remove tudo que não é dígito
+    private static string NormalizeCnpj(string? cnpj)
+    {
+        if (string.IsNullOrWhiteSpace(cnpj)) return string.Empty;
+        var arr = cnpj.Where(char.IsDigit).ToArray();
+        return new string(arr);
+    }
+
+    // DTO compatível com o que a API deve retornar para consulta por CNPJ
+    public class EmpresaDto
+    {
+        public int Id { get; set; }
+        public string? Cnpj { get; set; }
+        public string? CnpjFormatado { get; set; }
+        public string? Nome { get; set; }
+        public string? Endereco { get; set; }
+        public string? AtividadePrincipal { get; set; }
+    }
+}

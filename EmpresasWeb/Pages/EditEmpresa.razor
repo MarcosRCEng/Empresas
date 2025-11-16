@@ -1,13 +1,19 @@
-@page "/empresas/edit/{id:int}"
+@page "/empresas/editar/{id:int}"
 @inject IHttpClientFactory ClientFactory
+@inject NavigationManager Navigation
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.Components.Forms
 
 <h3>Editar Empresa</h3>
 
-@if (Empresa == null)
+@if (isLoading)
 {
     <p>Carregando...</p>
+}
+else if (loadError != null)
+{
+    <div class="alert alert-danger">@loadError</div>
+    <button class="btn btn-secondary" @onclick="GoBack">Voltar</button>
 }
 else
 {
@@ -30,7 +36,10 @@ else
             <InputText class="form-control" @bind-Value="Empresa.AtividadePrincipal" />
         </div>
 
-        <button class="btn btn-primary" type="submit">Salvar</button>
+        <button class="btn btn-primary" type="submit" disabled="@isSaving">
+            @(isSaving ? "Salvando..." : "Salvar")
+        </button>
+        <button type="button" class="btn btn-secondary ms-2" @onclick="GoBack">Cancelar</button>
     </EditForm>
 }
 
@@ -39,21 +48,73 @@ else
 
     private HttpClient Http => ClientFactory.CreateClient("ApiClient");
     private EmpresaDto? Empresa;
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private string? loadError;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        Empresa = await Http.GetFromJsonAsync<EmpresaDto>($"api/empresas/{id}");
+        isLoading = true;
+        loadError = null;
+        Empresa = null;
+        try
+        {
+            Empresa = await Http.GetFromJsonAsync<EmpresaDto>($"api/empresas/{id}");
+            if (Empresa == null)
+            {
+                loadError = "Empresa não encontrada.";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadError = "Erro ao carregar a empresa: " + ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private async Task Salvar()
     {
-        await Http.PutAsJsonAsync($"api/empresas/{id}", Empresa);
+        if (Empresa == null) return;
+
+        isSaving = true;
+        try
+        {
+            // Opcional: normalizar CNPJ no cliente antes de enviar, se o campo existir
+            // Empresa.Cnpj = CnpjHelper.Format(CnpjHelper.Normalize(Empresa.Cnpj));
+
+            var resp = await Http.PutAsJsonAsync($"api/empresas/{id}", Empresa);
+            if (resp.IsSuccessStatusCode)
+            {
+                // redireciona para detalhes após salvar
+                Navigation.NavigateTo($"/empresas/{id}");
+            }
+            else
+            {
+                var text = await resp.Content.ReadAsStringAsync();
+                loadError = $"Falha ao salvar: {resp.StatusCode} - {text}";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadError = "Erro ao salvar: " + ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
     }
+
+    private void GoBack() => Navigation.NavigateTo("/empresas");
 
     public class EmpresaDto
     {
+        public int Id { get; set; }
         public string? Nome { get; set; }
         public string? Endereco { get; set; }
         public string? AtividadePrincipal { get; set; }
+        // incluir Cnpj/CnpjFormatado se editar/mostrar aqui
     }
 }

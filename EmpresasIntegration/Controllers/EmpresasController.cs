@@ -1,7 +1,12 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using EmpresasIntegration.Data;
 using EmpresasIntegration.Models;
+using EmpresasIntegration.Services;
+using Shared.Helpers;
 
 namespace EmpresasIntegration.Controllers
 {
@@ -10,10 +15,12 @@ namespace EmpresasIntegration.Controllers
     public class EmpresasController : ControllerBase
     {
         private readonly AppDbContext _db;
+        private readonly ReceitawsService _receita;
 
-        public EmpresasController(AppDbContext db)
+        public EmpresasController(AppDbContext db, ReceitawsService receitawsService)
         {
             _db = db;
+            _receita = receitawsService;
         }
 
         [HttpGet]
@@ -55,6 +62,108 @@ namespace EmpresasIntegration.Controllers
             });
         }
 
+        // Novo endpoint: busca por CNPJ (normalizado ou formatado)
+        // GET api/empresas/cnpj/{cnpj}
+        [HttpGet("cnpj/{cnpj}")]
+        public async Task<IActionResult> GetByCnpj(string cnpj)
+        {
+            if (string.IsNullOrWhiteSpace(cnpj))
+                return BadRequest("CNPJ obrigatório.");
+
+            var normalized = CnpjHelper.Normalize(cnpj);
+            if (!CnpjHelper.IsValidBasic(normalized))
+                return BadRequest("CNPJ inválido. Deve conter 14 dígitos.");
+
+            Empresa? empresa = null;
+
+            // 1) Tentar buscar pela coluna shadow/explicit CnpjNormalized (eficiente se mapeada e populada)
+            try
+            {
+                empresa = await _db.Empresas
+                    .Where(e => EF.Property<string>(e, "CnpjNormalized") == normalized)
+                    .FirstOrDefaultAsync();
+            }
+            catch
+            {
+                // Se EF.Property lançar (coluna não mapeada), ignoramos e vamos para fallback
+                empresa = null;
+            }
+
+            // 2) Fallback: buscar comparando dígitos do campo Cnpj (ineficiente em tabelas grandes)
+            if (empresa == null)
+            {
+                empresa = await Task.Run(() =>
+                    _db.Empresas
+                       .AsEnumerable()
+                       .FirstOrDefault(e => CnpjHelper.Normalize(e.Cnpj) == normalized)
+                );
+            }
+
+            if (empresa != null)
+            {
+                var endereco = $"{empresa.Logradouro}, {empresa.Numero} {empresa.Complemento}, {empresa.Bairro}, {empresa.Municipio} - {empresa.Uf}, {empresa.Cep}";
+                return Ok(new
+                {
+                    empresa.Id,
+                    empresa.Cnpj,
+                    empresa.Nome,
+                    empresa.Fantasia,
+                    empresa.Situacao,
+                    empresa.Tipo,
+                    empresa.NaturezaJuridica,
+                    empresa.AtividadePrincipalJson,
+                    Endereco = endereco,
+                    empresa.Email,
+                    empresa.Telefone,
+                    empresa.Abertura,
+                    empresa.DataSituacao,
+                    empresa.CapitalSocial,
+                    empresa.CreatedAt,
+                    empresa.UpdatedAt
+                });
+            }
+
+            // 3) Não encontrado localmente: consultar a Receita e persistir
+            try
+            {
+                var fetched = await _receita.FetchAndSaveAsync(normalized);
+                if (fetched == null) return NotFound();
+
+                var endereco = $"{fetched.Logradouro}, {fetched.Numero} {fetched.Complemento}, {fetched.Bairro}, {fetched.Municipio} - {fetched.Uf}, {fetched.Cep}";
+                return Ok(new
+                {
+                    fetched.Id,
+                    fetched.Cnpj,
+                    fetched.Nome,
+                    fetched.Fantasia,
+                    fetched.Situacao,
+                    fetched.Tipo,
+                    fetched.NaturezaJuridica,
+                    fetched.AtividadePrincipalJson,
+                    Endereco = endereco,
+                    fetched.Email,
+                    fetched.Telefone,
+                    fetched.Abertura,
+                    fetched.DataSituacao,
+                    fetched.CapitalSocial,
+                    fetched.CreatedAt,
+                    fetched.UpdatedAt
+                });
+            }
+            catch (HttpRequestException ex)
+            {
+                return StatusCode(502, $"Erro ao consultar serviço externo: {ex.Message}");
+            }
+            catch (InvalidOperationException ex)
+            {
+                return StatusCode(502, $"Resposta inválida do serviço externo: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Erro interno: {ex.Message}");
+            }
+        }
+
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateEmpresa(int id, [FromBody] EmpresaDto dto)
         {
@@ -89,7 +198,8 @@ namespace EmpresasIntegration.Controllers
                 Municipio = dto.Municipio,
                 Uf = dto.Uf,
                 Cep = dto.Cep,
-                AtividadePrincipalJson = dto.AtividadePrincipalJson
+                AtividadePrincipalJson = dto.AtividadePrincipalJson,
+                CreatedAt = DateTime.UtcNow
             };
 
             _db.Empresas.Add(empresa);
@@ -100,7 +210,7 @@ namespace EmpresasIntegration.Controllers
 
         public class EmpresaDto
         {
-            public string? Cnpj { get; set; } = string.Empty;
+            public string? Cnpj { get; set; }
             public string? Nome { get; set; }
             public string? Logradouro { get; set; }
             public string? Numero { get; set; }
